@@ -6,7 +6,7 @@ set -euo pipefail
 
 ### VARIABLES ###
 POD_CIDR="192.168.0.0/16"
-K8S_VERSION="1.29"  # You can adjust as needed
+K8S_VERSION="1.32"  # You can adjust as needed
 CALICO_VERSION="v3.27.0"
 
 echo "[INFO] Starting Kubernetes master setup..."
@@ -29,17 +29,30 @@ systemctl start docker
 
 ### STEP 4: Install kubeadm, kubelet, kubectl ###
 echo "[INFO] Installing Kubernetes components"
-apt install -y apt-transport-https curl gnupg lsb-release
+#These instructions are for Kubernetes v1.32.
+#Update the apt package index and install packages needed to use the Kubernetes apt repository:
 
-curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /etc/apt/trusted.gpg.d/kubernetes.gpg
+sudo apt-get update
+# apt-transport-https may be a dummy package; if so, you can skip that package
+sudo apt-get install -y apt-transport-https ca-certificates curl gpg
 
-cat <<EOF >/etc/apt/sources.list.d/kubernetes.list
-deb http://apt.kubernetes.io/ kubernetes-xenial main
-EOF
+#Download the public signing key for the Kubernetes package repositories. The same signing key is used for all repositories so you can disregard the version in the URL:
 
-apt update
-apt install -y kubelet kubeadm kubectl
-apt-mark hold kubelet kubeadm kubectl
+# If the directory `/etc/apt/keyrings` does not exist, it should be created before the curl command, read the note below.
+# sudo mkdir -p -m 755 /etc/apt/keyrings
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+#Add the appropriate Kubernetes apt repository. Please note that this repository have packages only for Kubernetes 1.32; for other Kubernetes minor versions, you need to change the Kubernetes minor version in the URL to match your desired minor version (you should also check that you are reading the documentation for the version of Kubernetes that you plan to install).
+
+# This overwrites any existing configuration in /etc/apt/sources.list.d/kubernetes.list
+echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+#Update the apt package index, install kubelet, kubeadm and kubectl, and pin their version:
+
+sudo apt-get update
+sudo apt-get install -y kubelet kubeadm kubectl
+
+sudo systemctl enable kubelet
 
 ### STEP 5: Initialize Kubernetes master ###
 echo "[INFO] Initializing Kubernetes master with pod CIDR $POD_CIDR"
@@ -50,6 +63,7 @@ kubeadm init --pod-network-cidr="$POD_CIDR" --kubernetes-version="${K8S_VERSION}
 
 ### STEP 6: Configure kubectl ###
 echo "[INFO] Setting up kubeconfig"
+
 mkdir -p $HOME/.kube
 cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 chown "$(id -u)":"$(id -g)" $HOME/.kube/config
