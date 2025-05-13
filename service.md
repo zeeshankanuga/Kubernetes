@@ -1,7 +1,11 @@
 # ✅ Why Services Are Needed
 - Pods are dynamic: They can be restarted or rescheduled, changing their IP addresses.
 - Services provide a stable virtual IP (ClusterIP) and DNS name that stays constant, even if the underlying Pods change.
-
+---
+- Load Balancing
+- Service Discovery
+- Exposing Application to external world
+---
 ## 🛠️ How a Service Works
 - Selector: A Service uses a label selector to identify the Pods it routes traffic to.
 - ClusterIP: The Service gets a virtual IP address accessible inside the cluster.
